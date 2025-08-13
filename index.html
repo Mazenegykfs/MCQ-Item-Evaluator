@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCQ Item Evaluator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font for a stylish look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- SheetJS for XLSX export -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0f2fe; /* Light blue background */
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+        .btn-primary {
+            background-color: #3b82f6; /* Blue */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary:hover {
+            background-color: #2563eb; /* Darker blue */
+            transform: translateY(-2px);
+        }
+        .btn-export {
+            background-color: #10b981; /* Green */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-export:hover {
+            background-color: #059669; /* Darker green */
+            transform: translateY(-2px);
+        }
+        input[type="text"],
+        input[type="file"],
+        textarea,
+        select {
+            border: 1px solid #d1d5db; /* Light gray border */
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            width: 100%;
+            background-color: #f9fafb; /* Off-white background */
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        input[type="text"]:focus,
+        input[type="file"]:focus,
+        textarea:focus,
+        select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+            outline: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate; /* Allows border-radius on cells */
+            border-spacing: 0; /* Remove default spacing */
+            border-radius: 1rem; /* Rounded corners for the whole table */
+            overflow: hidden; /* Ensures rounded corners are visible */
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb; /* Light gray line between rows */
+        }
+        th {
+            background-color: #bfdbfe; /* Lighter blue for headers */
+            font-weight: 600;
+            color: #1f2937; /* Darker text */
+        }
+        tr:nth-child(even) {
+            background-color: #eff6ff; /* Very light blue for even rows */
+        }
+        tr:hover {
+            background-color: #dbeafe; /* Slightly darker light blue on hover */
+        }
+        /* Style for the last row's bottom border */
+        tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body class="p-6 flex flex-col items-center min-h-screen">
+    <header class="w-full text-center py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-b-3xl shadow-lg mb-8">
+        <h1 class="text-3xl font-bold">MCQ Item Evaluator</h1>
+        <p class="text-lg mt-2">Developed by Dr. Mazen Badawy – Doctorate of English Teaching and Testing</p>
+    </header>
+
+    <div class="container mx-auto p-8 bg-white rounded-3xl shadow-xl flex flex-col space-y-8">
+        <!-- Input Section -->
+        <div class="card p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Setup & Configuration</h2>
+
+            <div class="mb-6">
+                <label for="fileInput" class="block text-gray-700 text-lg font-semibold mb-2">
+                    Upload XLSX/CSV File with Questions:
+                </label>
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md">
+                <p class="text-sm text-gray-500 mt-1">Headers will be used as questions.</p>
+            </div>
+
+            <div class="mb-6">
+                <label for="categoriesInput" class="block text-gray-700 text-lg font-semibold mb-2">
+                    Enter Categories (e.g., Grammar, Vocabulary, Reading):
+                </label>
+                <textarea id="categoriesInput" rows="2" class="focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md" placeholder="e.g., Grammar, Vocabulary, Reading Comprehension"></textarea>
+            </div>
+
+            <div class="mb-6">
+                <label for="answerKeyInput" class="block text-gray-700 text-lg font-semibold mb-2">
+                    Enter Answer Key (comma-separated, in order of questions):
+                </label>
+                <textarea id="answerKeyInput" rows="3" class="focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md" placeholder="e.g., Paris, Apple, Run, Red, Large"></textarea>
+            </div>
+        </div>
+
+        <!-- Questions and Category Assignment Section (dynamically populated) -->
+        <div class="card p-6" id="questionsSection">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Assign Categories to Questions</h2>
+            <div id="questionList" class="space-y-4">
+                <!-- Questions will be dynamically loaded here -->
+                <p class="text-gray-600 text-center">Upload an XLSX/CSV file to see questions here.</p>
+            </div>
+        </div>
+
+        <!-- Moved Evaluate Button Here -->
+        <button id="evaluateBtn" class="w-full btn-primary text-xl font-bold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out">
+            Evaluate Answers
+        </button>
+
+        <!-- Results Section -->
+        <div class="card p-6 hidden" id="resultsSection">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Evaluation Results</h2>
+
+            <div id="correctAnswersTable" class="mb-8">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Correct Answers Per Item</h3>
+                <!-- Results table will be loaded here -->
+            </div>
+
+            <div id="categoryResultsTable" class="mb-8">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Correct Answers Per Category</h3>
+                <!-- Category results table will be loaded here -->
+            </div>
+
+            <button id="exportBtn" class="w-full btn-export text-xl font-bold hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-300 ease-in-out">
+                Export Results to XLSX
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let questions = []; // Stores the parsed question headers
+        let respondentsData = []; // Stores the parsed answers from respondents
+        let individualResultsForExport = []; // New array to store individual respondent results for export
+
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const categoriesInput = document.getElementById('categoriesInput');
+        const answerKeyInput = document.getElementById('answerKeyInput');
+        const evaluateBtn = document.getElementById('evaluateBtn');
+        const questionList = document.getElementById('questionList');
+        const resultsSection = document.getElementById('resultsSection');
+        const correctAnswersTableDiv = document.getElementById('correctAnswersTable');
+        const categoryResultsTableDiv = document.getElementById('categoryResultsTable');
+        const exportBtn = document.getElementById('exportBtn');
+
+        /**
+         * Reads the uploaded file (XLSX or CSV) and parses its content.
+         * @param {Event} event - The file input change event.
+         */
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                console.log("No file selected.");
+                return;
+            }
+            console.log("File selected:", file.name);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                let workbook;
+
+                try {
+                    // Try parsing as XLSX first
+                    workbook = XLSX.read(data, { type: 'array' });
+                } catch (xlsxError) {
+                    // If XLSX parsing fails, try parsing as CSV (text)
+                    try {
+                        const textData = new TextDecoder().decode(data);
+                        workbook = XLSX.read(textData, { type: 'string' });
+                    } catch (csvError) {
+                        alert('Error reading file: Not a valid XLSX or CSV format. Please ensure your file is correctly formatted.');
+                        console.error('XLSX parsing error:', xlsxError);
+                        console.error('CSV parsing error:', csvError);
+                        return;
+                    }
+                }
+
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to array of arrays (AOA)
+                const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                if (aoa.length === 0) {
+                    alert('The uploaded file is empty or could not be parsed.');
+                    questions = [];
+                    respondentsData = [];
+                    renderQuestions();
+                    console.log("Uploaded file is empty or invalid.");
+                    return;
+                }
+
+                // The first row is the header (questions)
+                questions = aoa[0].map(q => String(q || '').trim()); // Ensure questions are strings and trimmed, handle potential null/undefined headers
+
+                // Subsequent rows are respondent answers
+                respondentsData = aoa.slice(1).map(row => row.map(cell => String(cell || '').trim())); // Ensure answers are strings, handle empty cells
+
+                console.log("Questions loaded:", questions);
+                console.log("Respondents data loaded:", respondentsData);
+
+                // Render questions to the UI
+                renderQuestions();
+                resultsSection.classList.add('hidden'); // Hide results until evaluated again
+            };
+            reader.readAsArrayBuffer(file); // Read as array buffer for XLSX
+        }
+
+        /**
+         * Renders the questions dynamically and creates a dropdown for category selection beside each.
+         */
+        function renderQuestions() {
+            questionList.innerHTML = ''; // Clear previous questions
+            if (questions.length === 0) {
+                questionList.innerHTML = '<p class="text-gray-600 text-center">No questions found. Please upload a file.</p>';
+                return;
+            }
+
+            questions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 p-3 bg-blue-50 rounded-lg shadow-sm';
+                questionDiv.innerHTML = `
+                    <p class="font-medium text-gray-800 flex-grow text-lg">${q}</p>
+                    <select id="category-select-${index}" class="category-select w-full sm:w-auto min-w-[150px] p-2 border border-gray-300 rounded-md bg-white text-gray-700">
+                        <option value="">Select Category</option>
+                    </select>
+                `;
+                questionList.appendChild(questionDiv);
+            });
+
+            // Populate category dropdowns with options from categoriesInput when user types or on initial load
+            categoriesInput.addEventListener('input', updateCategoryDropdowns);
+            updateCategoryDropdowns(); // Initial population
+        }
+
+        /**
+         * Updates the options in all category dropdowns based on the categoriesInput textarea.
+         */
+        function updateCategoryDropdowns() {
+            const categories = categoriesInput.value.split(',').map(cat => cat.trim()).filter(cat => cat !== '');
+            const categorySelects = document.querySelectorAll('.category-select');
+
+            categorySelects.forEach(select => {
+                const currentValue = select.value; // Preserve selected value if it exists in new list
+                select.innerHTML = '<option value="">Select Category</option>'; // Always add default option
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    select.appendChild(option);
+                });
+                // Restore the previously selected value if it's still an option
+                if (categories.includes(currentValue)) {
+                    select.value = currentValue;
+                }
+            });
+        }
+
+
+        /**
+         * Evaluates the answers based on the answer key and category assignments.
+         */
+        function evaluateAnswers() {
+            console.log("Evaluate Answers button clicked.");
+            console.log("Questions array length:", questions.length);
+            console.log("Respondents data length:", respondentsData.length);
+
+            if (questions.length === 0) {
+                alert('Please upload a file with questions first.');
+                console.log("Error: No questions loaded.");
+                return;
+            }
+
+            const answerKeyRaw = answerKeyInput.value.split(',').map(ans => ans.trim()).filter(ans => ans !== '');
+            console.log("Answer Key Length:", answerKeyRaw.length);
+
+            if (answerKeyRaw.length !== questions.length) {
+                alert('Error: The number of answers in the key does not match the number of questions loaded from the file.');
+                console.log("Error: Answer key length mismatch.");
+                return;
+            }
+
+            // Get selected categories for each question
+            const questionCategories = [];
+            let allCategoriesAssigned = true;
+            for (let i = 0; i < questions.length; i++) {
+                const selectElement = document.getElementById(`category-select-${i}`);
+                if (selectElement && selectElement.value) {
+                    questionCategories.push(selectElement.value);
+                } else {
+                    allCategoriesAssigned = false;
+                    // We don't break here to allow the alert to show all unassigned categories if needed
+                }
+            }
+            console.log("All categories assigned:", allCategoriesAssigned);
+
+            if (!allCategoriesAssigned) {
+                alert('Please assign a category to all questions before evaluating.');
+                console.log("Error: Not all categories assigned.");
+                return;
+            }
+
+            console.log("Starting evaluation logic...");
+            // Initialize results structures
+            const itemCorrectCounts = new Array(questions.length).fill(0);
+            const categoryCorrectCounts = {};
+            const categoryTotalCounts = {};
+            const allCategories = categoriesInput.value.split(',').map(c => c.trim()).filter(c => c);
+            allCategories.forEach(cat => {
+                categoryCorrectCounts[cat] = 0;
+                categoryTotalCounts[cat] = 0;
+            });
+
+            // Initialize individual results for export
+            individualResultsForExport = [];
+            // Add header row for individual results sheet
+            const individualHeaders = ['Respondent ID'].concat(questions);
+            individualResultsForExport.push(individualHeaders);
+
+            // Evaluate each respondent's answers
+            respondentsData.forEach((respondentAnswers, respondentIndex) => {
+                const respondentRow = [`Respondent ${respondentIndex + 1}`]; // Start with respondent ID
+
+                respondentAnswers.forEach((answer, questionIndex) => {
+                    // Ensure the answer key has an entry for this question index
+                    if (answerKeyRaw[questionIndex] !== undefined) {
+                        const correctAnswer = answerKeyRaw[questionIndex];
+                        const questionCategory = questionCategories[questionIndex];
+
+                        // Check if answer matches the key (case-insensitive)
+                        if (answer.toLowerCase() === correctAnswer.toLowerCase()) {
+                            itemCorrectCounts[questionIndex]++;
+                            if (questionCategory) {
+                                categoryCorrectCounts[questionCategory]++;
+                            }
+                            respondentRow.push(1); // Correct answer represented as 1
+                        } else {
+                            respondentRow.push(0); // Incorrect answer represented as 0
+                        }
+                        if (questionCategory) {
+                             categoryTotalCounts[questionCategory]++;
+                        }
+                    } else {
+                        // Handle cases where a respondent might have more answers than questions in the key
+                        respondentRow.push(''); // Or some other indicator for missing answer key
+                    }
+                });
+                individualResultsForExport.push(respondentRow); // Add respondent's row to individual results
+            });
+
+            console.log("Calling renderResultsTables...");
+            renderResultsTables(itemCorrectCounts, categoryCorrectCounts, categoryTotalCounts);
+            console.log("Showing results section...");
+            resultsSection.classList.remove('hidden');
+            console.log("Evaluation complete.");
+        }
+
+        /**
+         * Renders the results tables into the DOM.
+         * @param {number[]} itemCorrectCounts - Array of correct answers for each item.
+         * @param {Object.<string, number>} categoryCorrectCounts - Correct answers per category.
+         * @param {Object.<string, number>} categoryTotalCounts - Total questions per category.
+         */
+        let itemResultsForExport = [];
+        let categoryResultsForExport = [];
+
+        function renderResultsTables(itemCorrectCounts, categoryCorrectCounts, categoryTotalCounts) {
+            const totalRespondents = respondentsData.length;
+
+            // --- Render Correct Answers Per Item Table ---
+            let itemTableHtml = `
+                <table class="min-w-full bg-white shadow-md rounded-xl">
+                    <thead>
+                        <tr>
+                            <th class="py-3 px-4 text-left">Question</th>
+                            <th class="py-3 px-4 text-left">Category</th>
+                            <th class="py-3 px-4 text-left">Correct Answers</th>
+                            <th class="py-3 px-4 text-left">Total Respondents</th>
+                            <th class="py-3 px-4 text-left">Accuracy (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            itemResultsForExport = []; // Clear for new export data
+
+            questions.forEach((q, index) => {
+                const correctCount = itemCorrectCounts[index];
+                const accuracy = totalRespondents > 0 ? ((correctCount / totalRespondents) * 100).toFixed(2) : 0;
+                const categorySelectElement = document.getElementById(`category-select-${index}`);
+                const category = categorySelectElement ? categorySelectElement.value : 'N/A'; // Handle case where category might not be selected
+
+                itemTableHtml += `
+                    <tr>
+                        <td class="py-2 px-4 border-b border-gray-200">${q}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${category}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${correctCount}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${totalRespondents}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${accuracy}%</td>
+                    </tr>
+                `;
+                itemResultsForExport.push({
+                    Question: q,
+                    Category: category,
+                    'Correct Answers': correctCount,
+                    'Total Respondents': totalRespondents,
+                    'Accuracy (%)': parseFloat(accuracy)
+                });
+            });
+            itemTableHtml += `</tbody></table>`;
+            correctAnswersTableDiv.innerHTML = itemTableHtml;
+
+            // --- Render Correct Answers Per Category Table ---
+            let categoryTableHtml = `
+                <table class="min-w-full bg-white shadow-md rounded-xl">
+                    <thead>
+                        <tr>
+                            <th class="py-3 px-4 text-left">Category</th>
+                            <th class="py-3 px-4 text-left">Correct Answers</th>
+                            <th class="py-3 px-4 text-left">Total Questions in Category</th>
+                            <th class="py-3 px-4 text-left">Accuracy (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            categoryResultsForExport = []; // Clear for new export data
+
+            // Sort categories alphabetically for consistent display
+            const sortedCategories = Object.keys(categoryCorrectCounts).sort();
+
+            sortedCategories.forEach(cat => {
+                const correctCount = categoryCorrectCounts[cat];
+                const totalQuestionsInCategory = categoryTotalCounts[cat]; // Number of questions assigned to this category
+                const accuracy = totalQuestionsInCategory > 0 ? ((correctCount / totalQuestionsInCategory) * 100).toFixed(2) : 0;
+
+                categoryTableHtml += `
+                    <tr>
+                        <td class="py-2 px-4 border-b border-gray-200">${cat}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${correctCount}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${totalQuestionsInCategory}</td>
+                        <td class="py-2 px-4 border-b border-gray-200">${accuracy}%</td>
+                    </tr>
+                `;
+                categoryResultsForExport.push({
+                    Category: cat,
+                    'Correct Answers': correctCount,
+                    'Total Questions in Category': totalQuestionsInCategory,
+                    'Accuracy (%)': parseFloat(accuracy)
+                });
+            });
+            categoryTableHtml += `</tbody></table>`;
+            categoryResultsTableDiv.innerHTML = categoryTableHtml;
+        }
+
+        /**
+         * Exports the results to an XLSX file with two sheets.
+         */
+        function exportToXLSX() {
+            const wb = XLSX.utils.book_new();
+
+            // Add Item-wise Results sheet
+            const wsItem = XLSX.utils.json_to_sheet(itemResultsForExport);
+            XLSX.utils.book_append_sheet(wb, wsItem, "Item Results");
+
+            // Add Category-wise Results sheet
+            const wsCategory = XLSX.utils.json_to_sheet(categoryResultsForExport);
+            XLSX.utils.book_append_sheet(wb, wsCategory, "Category Results");
+
+            // Add Individual Results sheet
+            // Use aoa_to_sheet for array of arrays format
+            const wsIndividual = XLSX.utils.aoa_to_sheet(individualResultsForExport);
+            XLSX.utils.book_append_sheet(wb, wsIndividual, "Individual Results");
+
+
+            // Write and download the file
+            XLSX.writeFile(wb, "MCQ_Evaluation_Results.xlsx");
+        }
+
+        // --- Event Listeners and Initial Load ---
+        fileInput.addEventListener('change', handleFile);
+        evaluateBtn.addEventListener('click', evaluateAnswers);
+        exportBtn.addEventListener('click', exportToXLSX);
+
+        // Initial render with empty questions, awaiting file upload
+        document.addEventListener('DOMContentLoaded', () => {
+            renderQuestions();
+        });
+    </script>
+</body>
+</html>
