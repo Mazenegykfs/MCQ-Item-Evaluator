@@ -48,6 +48,22 @@
             background-color: #059669; /* Darker green */
             transform: translateY(-2px);
         }
+        .btn-template {
+            background-color: #60a5fa; /* Lighter blue for template */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: absolute; /* Position relative to header */
+            top: 1.5rem;
+            left: 2rem;
+            font-size: 0.9rem;
+        }
+        .btn-template:hover {
+            background-color: #3b82f6;
+            transform: translateY(-1px);
+        }
         input[type="text"],
         input[type="file"],
         textarea,
@@ -94,10 +110,24 @@
         tr:last-child td {
             border-bottom: none;
         }
+        .error-message {
+            color: #ef4444; /* Red color */
+            background-color: #fee2e2; /* Light red background */
+            border: 1px solid #fca5a5; /* Red border */
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            display: none; /* Hidden by default */
+        }
+        .error-border {
+            border-color: #ef4444 !important; /* Red border for invalid inputs */
+        }
     </style>
 </head>
 <body class="p-6 flex flex-col items-center min-h-screen">
-    <header class="w-full text-center py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-b-3xl shadow-lg mb-8">
+    <header class="w-full text-center py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-b-3xl shadow-lg mb-8 relative">
+        <button id="downloadTemplateBtn" class="btn-template">Download Template</button>
         <h1 class="text-3xl font-bold">MCQ Item Evaluator</h1>
         <p class="text-lg mt-2">Developed by Dr. Mazen Badawy – Doctorate of English Teaching and Testing</p>
     </header>
@@ -113,6 +143,7 @@
                 </label>
                 <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md">
                 <p class="text-sm text-gray-500 mt-1">Headers will be used as questions.</p>
+                <div id="fileError" class="error-message"></div>
             </div>
 
             <div class="mb-6">
@@ -120,6 +151,7 @@
                     Enter Categories (e.g., Grammar, Vocabulary, Reading):
                 </label>
                 <textarea id="categoriesInput" rows="2" class="focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md" placeholder="e.g., Grammar, Vocabulary, Reading Comprehension"></textarea>
+                <div id="categoriesError" class="error-message"></div>
             </div>
 
             <div class="mb-6">
@@ -127,6 +159,7 @@
                     Enter Answer Key (comma-separated, in order of questions):
                 </label>
                 <textarea id="answerKeyInput" rows="3" class="focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md" placeholder="e.g., Paris, Apple, Run, Red, Large"></textarea>
+                <div id="answerKeyError" class="error-message"></div>
             </div>
         </div>
 
@@ -137,6 +170,7 @@
                 <!-- Questions will be dynamically loaded here -->
                 <p class="text-gray-600 text-center">Upload an XLSX/CSV file to see questions here.</p>
             </div>
+            <div id="categoryAssignmentError" class="error-message"></div>
         </div>
 
         <!-- Moved Evaluate Button Here -->
@@ -179,18 +213,55 @@
         const correctAnswersTableDiv = document.getElementById('correctAnswersTable');
         const categoryResultsTableDiv = document.getElementById('categoryResultsTable');
         const exportBtn = document.getElementById('exportBtn');
+        const downloadTemplateBtn = document.getElementById('downloadTemplateBtn'); // New button element
+
+        // Error Message Divs
+        const fileErrorDiv = document.getElementById('fileError');
+        const categoriesErrorDiv = document.getElementById('categoriesError');
+        const answerKeyErrorDiv = document.getElementById('answerKeyError');
+        const categoryAssignmentErrorDiv = document.getElementById('categoryAssignmentError');
+
+        /**
+         * Displays an error message in the specified div and adds a border to the input.
+         * @param {HTMLElement} errorDiv - The div element to display the message in.
+         * @param {HTMLElement} inputElement - The input element to add the error border to.
+         * @param {string} message - The error message to display.
+         */
+        function displayError(errorDiv, inputElement, message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            if (inputElement) {
+                inputElement.classList.add('error-border');
+            }
+        }
+
+        /**
+         * Clears an error message and removes the error border.
+         * @param {HTMLElement} errorDiv - The div element to clear.
+         * @param {HTMLElement} inputElement - The input element to remove the error border from.
+         */
+        function clearError(errorDiv, inputElement) {
+            errorDiv.textContent = '';
+            errorDiv.style.display = 'none';
+            if (inputElement) {
+                inputElement.classList.remove('error-border');
+            }
+        }
 
         /**
          * Reads the uploaded file (XLSX or CSV) and parses its content.
          * @param {Event} event - The file input change event.
          */
         function handleFile(event) {
+            clearError(fileErrorDiv, fileInput); // Clear previous file errors
             const file = event.target.files[0];
             if (!file) {
-                console.log("No file selected.");
+                displayError(fileErrorDiv, fileInput, 'No file selected. Please upload your question file.');
+                questions = [];
+                respondentsData = [];
+                renderQuestions(); // Render empty list
                 return;
             }
-            console.log("File selected:", file.name);
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -206,9 +277,10 @@
                         const textData = new TextDecoder().decode(data);
                         workbook = XLSX.read(textData, { type: 'string' });
                     } catch (csvError) {
-                        alert('Error reading file: Not a valid XLSX or CSV format. Please ensure your file is correctly formatted.');
-                        console.error('XLSX parsing error:', xlsxError);
-                        console.error('CSV parsing error:', csvError);
+                        displayError(fileErrorDiv, fileInput, 'Error reading file: Not a valid XLSX or CSV format. Please ensure your file is correctly formatted.');
+                        questions = [];
+                        respondentsData = [];
+                        renderQuestions();
                         return;
                     }
                 }
@@ -220,11 +292,10 @@
                 const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
                 if (aoa.length === 0) {
-                    alert('The uploaded file is empty or could not be parsed.');
+                    displayError(fileErrorDiv, fileInput, 'The uploaded file is empty or could not be parsed. Please check its content.');
                     questions = [];
                     respondentsData = [];
                     renderQuestions();
-                    console.log("Uploaded file is empty or invalid.");
                     return;
                 }
 
@@ -233,9 +304,6 @@
 
                 // Subsequent rows are respondent answers
                 respondentsData = aoa.slice(1).map(row => row.map(cell => String(cell || '').trim())); // Ensure answers are strings, handle empty cells
-
-                console.log("Questions loaded:", questions);
-                console.log("Respondents data loaded:", respondentsData);
 
                 // Render questions to the UI
                 renderQuestions();
@@ -275,6 +343,7 @@
          * Updates the options in all category dropdowns based on the categoriesInput textarea.
          */
         function updateCategoryDropdowns() {
+            clearError(categoriesErrorDiv, categoriesInput); // Clear category error when input changes
             const categories = categoriesInput.value.split(',').map(cat => cat.trim()).filter(cat => cat !== '');
             const categorySelects = document.querySelectorAll('.category-select');
 
@@ -291,6 +360,8 @@
                 if (categories.includes(currentValue)) {
                     select.value = currentValue;
                 }
+                // Clear individual select error border if it's now valid
+                select.classList.remove('error-border');
             });
         }
 
@@ -299,98 +370,99 @@
          * Evaluates the answers based on the answer key and category assignments.
          */
         function evaluateAnswers() {
-            console.log("Evaluate Answers button clicked.");
-            console.log("Questions array length:", questions.length);
-            console.log("Respondents data length:", respondentsData.length);
+            // Clear all previous errors
+            clearError(fileErrorDiv, fileInput);
+            clearError(categoriesErrorDiv, categoriesInput);
+            clearError(answerKeyErrorDiv, answerKeyInput);
+            clearError(categoryAssignmentErrorDiv, null);
+            document.querySelectorAll('.category-select').forEach(select => {
+                select.classList.remove('error-border');
+            });
 
             if (questions.length === 0) {
-                alert('Please upload a file with questions first.');
-                console.log("Error: No questions loaded.");
+                displayError(fileErrorDiv, fileInput, 'Please upload a file with questions first to proceed with evaluation.');
                 return;
             }
 
             const answerKeyRaw = answerKeyInput.value.split(',').map(ans => ans.trim()).filter(ans => ans !== '');
-            console.log("Answer Key Length:", answerKeyRaw.length);
+            if (answerKeyRaw.length === 0) {
+                displayError(answerKeyErrorDiv, answerKeyInput, 'Please enter the answer key for your questions.');
+                return;
+            }
 
             if (answerKeyRaw.length !== questions.length) {
-                alert('Error: The number of answers in the key does not match the number of questions loaded from the file.');
-                console.log("Error: Answer key length mismatch.");
+                displayError(answerKeyErrorDiv, answerKeyInput, `Error: The number of answers (${answerKeyRaw.length}) in the key does not match the number of questions (${questions.length}) loaded from the file.`);
+                return;
+            }
+
+            // Check if categories input is empty
+            const categoriesDefined = categoriesInput.value.split(',').map(cat => cat.trim()).filter(cat => cat !== '');
+            if (categoriesDefined.length === 0) {
+                displayError(categoriesErrorDiv, categoriesInput, 'Please enter at least one category for your questions.');
                 return;
             }
 
             // Get selected categories for each question
             const questionCategories = [];
             let allCategoriesAssigned = true;
-            for (let i = 0; i < questions.length; i++) {
-                const selectElement = document.getElementById(`category-select-${i}`);
-                if (selectElement && selectElement.value) {
+            document.querySelectorAll('.category-select').forEach((selectElement, index) => {
+                if (selectElement.value) {
                     questionCategories.push(selectElement.value);
+                    selectElement.classList.remove('error-border'); // Clear error if assigned
                 } else {
                     allCategoriesAssigned = false;
-                    // We don't break here to allow the alert to show all unassigned categories if needed
+                    selectElement.classList.add('error-border'); // Add error border if unassigned
                 }
-            }
-            console.log("All categories assigned:", allCategoriesAssigned);
+            });
+
 
             if (!allCategoriesAssigned) {
-                alert('Please assign a category to all questions before evaluating.');
-                console.log("Error: Not all categories assigned.");
+                displayError(categoryAssignmentErrorDiv, null, 'Please assign a category to all questions before evaluating.');
                 return;
             }
 
-            console.log("Starting evaluation logic...");
-            // Initialize results structures
+            // All checks passed, proceed with evaluation logic
             const itemCorrectCounts = new Array(questions.length).fill(0);
             const categoryCorrectCounts = {};
             const categoryTotalCounts = {};
-            const allCategories = categoriesInput.value.split(',').map(c => c.trim()).filter(c => c);
-            allCategories.forEach(cat => {
+            categoriesDefined.forEach(cat => { // Use categoriesDefined for initialization
                 categoryCorrectCounts[cat] = 0;
                 categoryTotalCounts[cat] = 0;
             });
 
-            // Initialize individual results for export
             individualResultsForExport = [];
-            // Add header row for individual results sheet
             const individualHeaders = ['Respondent ID'].concat(questions);
             individualResultsForExport.push(individualHeaders);
 
-            // Evaluate each respondent's answers
             respondentsData.forEach((respondentAnswers, respondentIndex) => {
-                const respondentRow = [`Respondent ${respondentIndex + 1}`]; // Start with respondent ID
+                const respondentRow = [`Respondent ${respondentIndex + 1}`];
 
                 respondentAnswers.forEach((answer, questionIndex) => {
-                    // Ensure the answer key has an entry for this question index
                     if (answerKeyRaw[questionIndex] !== undefined) {
                         const correctAnswer = answerKeyRaw[questionIndex];
                         const questionCategory = questionCategories[questionIndex];
 
-                        // Check if answer matches the key (case-insensitive)
                         if (answer.toLowerCase() === correctAnswer.toLowerCase()) {
                             itemCorrectCounts[questionIndex]++;
                             if (questionCategory) {
                                 categoryCorrectCounts[questionCategory]++;
                             }
-                            respondentRow.push(1); // Correct answer represented as 1
+                            respondentRow.push(1);
                         } else {
-                            respondentRow.push(0); // Incorrect answer represented as 0
+                            respondentRow.push(0);
                         }
                         if (questionCategory) {
                              categoryTotalCounts[questionCategory]++;
                         }
                     } else {
-                        // Handle cases where a respondent might have more answers than questions in the key
-                        respondentRow.push(''); // Or some other indicator for missing answer key
+                        respondentRow.push('');
                     }
                 });
-                individualResultsForExport.push(respondentRow); // Add respondent's row to individual results
+                individualResultsForExport.push(respondentRow);
             });
 
-            console.log("Calling renderResultsTables...");
             renderResultsTables(itemCorrectCounts, categoryCorrectCounts, categoryTotalCounts);
-            console.log("Showing results section...");
-            resultsSection.classList.remove('hidden');
-            console.log("Evaluation complete.");
+            resultsSection.classList.remove('hidden'); // Make sure results section is visible
         }
 
         /**
@@ -467,7 +539,7 @@
 
             sortedCategories.forEach(cat => {
                 const correctCount = categoryCorrectCounts[cat];
-                const totalQuestionsInCategory = categoryTotalCounts[cat]; // Number of questions assigned to this category
+                const totalQuestionsInCategory = totalRespondents * questions.filter((_, i) => document.getElementById(`category-select-${i}`).value === cat).length; // Calculate total questions for this category from assigned questions
                 const accuracy = totalQuestionsInCategory > 0 ? ((correctCount / totalQuestionsInCategory) * 100).toFixed(2) : 0;
 
                 categoryTableHtml += `
@@ -513,10 +585,28 @@
             XLSX.writeFile(wb, "MCQ_Evaluation_Results.xlsx");
         }
 
+        /**
+         * Downloads a sample XLSX template file.
+         */
+        function downloadTemplate() {
+            const sampleData = [
+                ["Question 1: Which word means 'big'?", "Question 2: What is the capital of France?", "Question 3: Which is a primary color?", "Question 4: What is 2 + 2?"],
+                ["Large", "Paris", "Red", "4"],
+                ["Small", "London", "Blue", "5"],
+                ["Big", "Berlin", "Yellow", "3"]
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(sampleData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+            XLSX.writeFile(wb, "template.xlsx");
+        }
+
         // --- Event Listeners and Initial Load ---
         fileInput.addEventListener('change', handleFile);
         evaluateBtn.addEventListener('click', evaluateAnswers);
         exportBtn.addEventListener('click', exportToXLSX);
+        downloadTemplateBtn.addEventListener('click', downloadTemplate); // Event listener for the new button
 
         // Initial render with empty questions, awaiting file upload
         document.addEventListener('DOMContentLoaded', () => {
